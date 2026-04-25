@@ -35,8 +35,8 @@ def train_and_save():
     # Сохранение
     os.makedirs("models", exist_ok=True)
     joblib.dump(rf, "models/rf_model.pkl")
-    joblib.dump(wine.feature_names.tolist(), "models/feature_names.pkl")
-    joblib.dump(wine.target_names.tolist(), "models/target_names.pkl")
+    joblib.dump(list(wine.feature_names), "models/feature_names.pkl")
+    joblib.dump(list(wine.target_names), "models/target_names.pkl")
 
     print(f"Accuracy:  {metrics['accuracy']:.4f}")
     print(f"OOB Score: {metrics['oob_score']:.4f}")
