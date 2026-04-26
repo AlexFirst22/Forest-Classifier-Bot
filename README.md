@@ -45,28 +45,52 @@ of the wine type using a trained RF model.
 4. **OOB Score** — ~37% of data not used per tree = free built-in validation
 
 ## 📁 Project Structure
+```
 Forest-Classifier-Bot/
+│
 ├── bot/
-│   ├── bot.py              # Main bot entry point
-│   ├── handlers.py         # FSM handlers + all commands
-│   └── keyboards.py        # Reply and inline keyboards
+│   ├── __init__.py
+│   ├── bot.py
+│   ├── handlers.py
+│   └── keyboards.py
+│
 ├── ml/
-│   ├── train.py            # Model training + saving
-│   ├── predict.py          # Prediction function
-│   └── visualize.py        # Plot generation
+│   ├── __init__.py
+│   ├── train.py
+│   ├── predict.py
+│   └── visualize.py
+│
 ├── models/
-│   ├── rf_model.pkl        # Trained Random Forest model
-│   ├── feature_names.pkl   # Feature names
-│   └── target_names.pkl    # Target class names
-├── plots/                  # Generated visualizations (PNG)
+│   ├── rf_model.pkl
+│   ├── feature_names.pkl
+│   └── target_names.pkl
+│
+├── plots/
+│   ├── class_distribution.png
+│   ├── correlation_matrix.png
+│   ├── boxplot_features.png
+│   ├── pairplot.png
+│   ├── confusion_matrix.png
+│   ├── feature_importance.png
+│   ├── learning_curve.png
+│   ├── roc_curve.png
+│   ├── single_tree.png
+│   ├── depth_curve.png
+│   ├── confusion_matrix_cancer.png
+│   ├── feature_importance_cancer.png
+│   └── comparison.png
+│
 ├── notebooks/
-│   └── exploration.ipynb   # EDA + training + analysis
+│   └── exploration.ipynb
+│
 ├── report/
-│   └── explanation.md      # Project explanation (SK)
-├── config.py               # Token loader
+│   └── explanation.md
+│
+├── .env
+├── config.py
 ├── requirements.txt
 └── README.md
-
+```
 ## ⚙️ Installation & Setup
 
 ```bash
