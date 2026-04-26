@@ -1,59 +1,126 @@
-# Vysvetlenie fungovania programu — Random Forests
+# Project Explanation — Random Forests (náhodné lesy)
 
-## 1. Algoritmus Random Forest
+## 1. Algorithm Overview
 
-Random Forest je metóda strojového učenia založená na princípe **ensemble learningu**.
-Namiesto jedného rozhodovacieho stromu vytvorí veľký počet stromov (les)
-a výsledok určí hlasovaním.
+Random Forest is an ensemble machine learning method that builds a large number
+of decision trees during training and outputs the class that receives the most votes.
 
-### Kľúčové vlastnosti:
-- **Bootstrap agregácia (Bagging)** — každý strom sa učí na náhodnej podvzorke dát
-- **Náhodný výber príznakov** — pri každom rozdelení uzla sa vyberá náhodná podmnožina príznakov
-- **OOB Score** — ~37% dát sa nepoužije na tréning → bezplatná validácia
+### Core principles:
 
-## 2. Datasety
+**Bootstrap Aggregation (Bagging)**
+Each tree is trained on a random sample of the dataset drawn with replacement.
+On average, ~63% of samples appear in each bootstrap sample,
+while the remaining ~37% form the out-of-bag (OOB) set.
 
-### Wine Dataset
-- 178 vzoriek, 13 príznakov, 3 triedy vín
-- Accuracy: 100%, OOB: 97.89%, ROC-AUC: 100%
+**Random Feature Subspace**
+At every node split, only a random subset of features is evaluated.
+This decorrelates individual trees and reduces variance of the ensemble.
 
-### Breast Cancer Dataset
-- 569 vzoriek, 30 príznakov, 2 triedy
-- Väčší dataset pre porovnanie výkonu RF
+**Majority Voting**
+Each tree independently predicts a class label.
+The final prediction is determined by majority vote across all trees.
 
-## 3. Metriky efektívnosti
+**OOB Score**
+Since each tree never sees its OOB samples during training,
+these samples serve as a built-in validation set — no separate cross-validation needed.
 
-| Metrika | Popis |
+---
+
+## 2. Datasets Used
+
+### Wine Dataset (Primary)
+- **Source:** `sklearn.datasets.load_wine` (UCI Machine Learning Repository)
+- **Samples:** 178
+- **Features:** 13 chemical characteristics (alcohol, flavanoids, proline, etc.)
+- **Classes:** 3 Italian wines — Barolo, Grignolino, Barbera
+- **Used for:** Bot predictions, all main visualizations
+
+### Breast Cancer Dataset (Secondary)
+- **Source:** `sklearn.datasets.load_breast_cancer`
+- **Samples:** 569
+- **Features:** 30 (cell nucleus measurements)
+- **Classes:** 2 (Malignant, Benign)
+- **Used for:** Comparison, demonstrating RF scalability
+
+---
+
+## 3. Effectiveness Metrics
+
+| Metric | Description | Wine | Breast Cancer |
+|---|---|---|---|
+| Accuracy | Ratio of correct predictions | 1.0000 | ~0.9649 |
+| Precision | True positives / predicted positives | 1.0000 | ~0.96 |
+| Recall | True positives / actual positives | 1.0000 | ~0.96 |
+| F1-score | Harmonic mean of precision and recall | 1.0000 | ~0.96 |
+| ROC-AUC | Area under the ROC curve | 1.0000 | ~0.9970 |
+| OOB Score | Out-of-bag validation accuracy | 0.9789 | ~0.9614 |
+
+---
+
+## 4. Hyperparameter Analysis
+
+### n_estimators (number of trees)
+Tested values: 5, 10, 20, 50, 100, 150, 200
+- More trees → more stable predictions
+- Returns diminish after ~100 trees
+- Best balance at n_estimators=100
+
+### max_depth (tree depth)
+Tested values: 1, 2, 3, 5, 10, None
+- Shallow trees → underfitting
+- Deep trees → potential overfitting
+- None (full depth) works best for Wine dataset
+
+### GridSearchCV
+Full grid search over n_estimators, max_depth, min_samples_split
+with 5-fold cross-validation to find optimal hyperparameters.
+
+---
+
+## 5. Visualizations
+
+| Plot | What it shows |
 |---|---|
-| Accuracy | Podiel správnych predpovedí |
-| Precision | Presnosť pozitívnych predpovedí |
-| Recall | Úplnosť pozitívnych predpovedí |
-| F1-score | Harmonický priemer Precision a Recall |
-| ROC-AUC | Plocha pod ROC krivkou |
-| OOB Score | Validácia na out-of-bag vzorkách |
+| Feature Importance | Alcohol, flavanoids and proline are the most predictive |
+| Confusion Matrix | All 36 test samples correctly classified |
+| ROC Curve | AUC = 1.0 for all 3 classes |
+| Single Tree | Structure of one tree from the forest (max_depth=3) |
+| Learning Curve | Accuracy stabilizes around 50-100 trees |
+| Depth Curve | Effect of max_depth on train/test accuracy |
+| Comparison | RF performs well on both datasets |
 
-## 4. Vizualizácie
+---
 
-- **Feature Importance** — ktoré príznaky sú najdôležitejšie
-- **Confusion Matrix** — kde model robí chyby
-- **ROC Curve** — kompromis medzi TPR a FPR
-- **Learning Curve** — vplyv počtu stromov na presnosť
-- **Single Tree** — vizualizácia jedného stromu z lesa
-- **Depth Curve** — vplyv hĺbky stromu na presnosť
-- **Comparison** — porovnanie Wine vs Breast Cancer
+## 6. Functional Application — Telegram Bot
 
-## 5. Funkčná aplikácia — Telegram Bot
+The bot was built using **aiogram 3.x** and implements the following workflow:
 
-Bot umožňuje:
-1. Zadať 13 chemických vlastností vína
-2. Získať predpoveď triedy vína (class_0, class_1, class_2)
-3. Zobraziť percent istoty a hlasovanie stromov
-4. Zobraziť všetky vizualizácie priamo v chate
-5. Prečítať vysvetlenie algoritmu
+1. User starts the bot with `/start`
+2. User selects **🍷 Predict Wine**
+3. Bot asks for 13 chemical values one by one (FSM — Finite State Machine)
+4. Values are passed to the trained RF model via `ml/predict.py`
+5. Bot returns the predicted wine type (Barolo / Grignolino / Barbera),
+   confidence percentage, and individual tree votes
+6. User can also view all model graphs directly in the chat
+7. Algorithm explanation is available in plain language
 
-## 6. Technológie
+### Key implementation details:
+- **FSM (Finite State Machine)** — manages multi-step user input
+- **joblib** — loads pre-trained model from disk
+- **FSInputFile** — sends locally generated PNG plots to Telegram
+- **InlineKeyboardMarkup** — interactive graph selection menu
 
-- `scikit-learn` — RandomForestClassifier
-- `aiogram 3.x` — Telegram bot
-- `GridSearchCV` — optimalizácia hyperparametrov
-- `matplotlib`, `seaborn` — vizualizácie
+---
+
+## 7. Technologies
+
+| Library | Version | Purpose |
+|---|---|---|
+| scikit-learn | latest | RandomForestClassifier, GridSearchCV, metrics |
+| aiogram | 3.x | Telegram bot framework |
+| pandas | latest | Data manipulation |
+| numpy | latest | Numerical operations |
+| matplotlib | latest | Plot generation |
+| seaborn | latest | Statistical visualizations |
+| joblib | latest | Model serialization |
+| python-dotenv | latest | Environment variable management |
