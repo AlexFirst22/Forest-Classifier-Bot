@@ -66,3 +66,61 @@ Forest-Classifier-Bot/
 ├── config.py               # Token loader
 ├── requirements.txt
 └── README.md
+
+## ⚙️ Installation & Setup
+
+```bash
+git clone https://github.com/yourusername/Forest-Classifier-Bot
+cd Forest-Classifier-Bot
+pip install -r requirements.txt
+```
+
+Create a `.env` file in the root directory:
+
+Train the model and generate plots:
+```bash
+python ml/train.py
+```
+
+Run the bot:
+```bash
+python -m bot.bot
+```
+
+## 📈 Model Performance
+
+| Metric | Wine Dataset | Breast Cancer Dataset |
+|---|---|---|
+| Accuracy | 1.0000 | ~0.9649 |
+| OOB Score | 0.9789 | ~0.9614 |
+| ROC-AUC | 1.0000 | ~0.9970 |
+| n_estimators | 100 | 100 |
+| Features | 13 | 30 |
+| Samples | 178 | 569 |
+
+## 📊 Visualizations
+
+| Plot | Description |
+|---|---|
+| `feature_importance.png` | Most predictive wine features |
+| `confusion_matrix.png` | Prediction errors per class |
+| `roc_curve.png` | ROC curve for all 3 classes |
+| `single_tree.png` | One decision tree from the forest |
+| `learning_curve.png` | Accuracy vs number of trees |
+| `depth_curve.png` | Accuracy vs tree depth |
+| `comparison.png` | Wine vs Breast Cancer comparison |
+| `class_distribution.png` | Class balance in Wine dataset |
+| `correlation_matrix.png` | Feature correlation heatmap |
+| `boxplot_features.png` | Feature distributions per class |
+| `pairplot.png` | Pairwise feature relationships |
+
+## 🛠️ Technologies
+
+| Library | Purpose |
+|---|---|
+| `scikit-learn` | Random Forest model, GridSearchCV |
+| `aiogram 3.x` | Telegram bot framework |
+| `pandas`, `numpy` | Data processing |
+| `matplotlib`, `seaborn` | Visualizations |
+| `joblib` | Model persistence |
+| `python-dotenv` | Environment configuration |
