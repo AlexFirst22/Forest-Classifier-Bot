@@ -1,7 +1,7 @@
 import os
 from aiogram import Router, F
 from aiogram.types import Message, CallbackQuery, FSInputFile
-from aiogram.filters import CommandStart, Command
+from aiogram.filters import CommandStart
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 
@@ -10,47 +10,56 @@ from ml.predict import predict, load_model
 
 router = Router()
 
-# FSM для пошагового ввода
+WINE_CLASSES = {
+    0: "🍷 Barolo",
+    1: "🍇 Grignolino",
+    2: "🌹 Barbera"
+}
+
 class WineForm(StatesGroup):
     waiting_for_values = State()
 
 FEATURE_QUESTIONS = [
-    ("alcohol", "🍶 Alcohol (например: 13.2)"),
-    ("malic_acid", "🍋 Malic Acid (например: 1.78)"),
-    ("ash", "⚗️ Ash (например: 2.14)"),
-    ("alcalinity_of_ash", "🧪 Alcalinity of Ash (например: 11.2)"),
-    ("magnesium", "🔩 Magnesium (например: 100.0)"),
-    ("total_phenols", "🌿 Total Phenols (например: 2.65)"),
-    ("flavanoids", "🌸 Flavanoids (например: 2.76)"),
-    ("nonflavanoid_phenols", "🍂 Nonflavanoid Phenols (например: 0.26)"),
-    ("proanthocyanins", "🫐 Proanthocyanins (например: 1.28)"),
-    ("color_intensity", "🎨 Color Intensity (например: 4.38)"),
-    ("hue", "🌈 Hue (например: 1.05)"),
-    ("od280/od315_of_diluted_wines", "🔬 OD280/OD315 (например: 3.40)"),
-    ("proline", "💎 Proline (например: 1050.0)"),
+    ("alcohol",                      "🍶 Alcohol (e.g. 13.2)"),
+    ("malic_acid",                   "🍋 Malic Acid (e.g. 1.78)"),
+    ("ash",                          "⚗️ Ash (e.g. 2.14)"),
+    ("alcalinity_of_ash",            "🧪 Alcalinity of Ash (e.g. 11.2)"),
+    ("magnesium",                    "🔩 Magnesium (e.g. 100.0)"),
+    ("total_phenols",                "🌿 Total Phenols (e.g. 2.65)"),
+    ("flavanoids",                   "🌸 Flavanoids (e.g. 2.76)"),
+    ("nonflavanoid_phenols",         "🍂 Nonflavanoid Phenols (e.g. 0.26)"),
+    ("proanthocyanins",              "🫐 Proanthocyanins (e.g. 1.28)"),
+    ("color_intensity",              "🎨 Color Intensity (e.g. 4.38)"),
+    ("hue",                          "🌈 Hue (e.g. 1.05)"),
+    ("od280/od315_of_diluted_wines", "🔬 OD280/OD315 (e.g. 3.40)"),
+    ("proline",                      "💎 Proline (e.g. 1050.0)"),
 ]
 
 # /start
 @router.message(CommandStart())
 async def cmd_start(message: Message):
     await message.answer(
-        "👋 Привет! Я <b>Forest Classifier Bot</b> 🌲\n\n"
-        "Я умею определять класс вина по его химическим характеристикам "
-        "с помощью алгоритма <b>Random Forest</b>.\n\n"
-        "Выбери действие в меню 👇",
+        "👋 Welcome to <b>Forest Classifier Bot</b> 🌲\n\n"
+        "I can identify the type of Italian wine based on its chemical characteristics "
+        "using the <b>Random Forest</b> algorithm.\n\n"
+        "🍷 Wines I can classify:\n"
+        "• <b>Barolo</b> — bold, tannic, full-bodied\n"
+        "• <b>Grignolino</b> — light, delicate, aromatic\n"
+        "• <b>Barbera</b> — fruity, low tannin, high acidity\n\n"
+        "Choose an action below 👇",
         parse_mode="HTML",
         reply_markup=main_menu()
     )
 
-# Предсказание
-@router.message(F.text == "🍷 Предсказать вино")
+# Predict
+@router.message(F.text == "🍷 Predict Wine")
 async def start_predict(message: Message, state: FSMContext):
     await state.set_state(WineForm.waiting_for_values)
     await state.update_data(step=0, values=[])
     feature, question = FEATURE_QUESTIONS[0]
     await message.answer(
-        f"Отлично! Введём характеристики вина по очереди.\n\n"
-        f"<b>Шаг 1/13</b>\n{question}",
+        "Let's classify your wine! Enter the chemical characteristics one by one.\n\n"
+        f"<b>Step 1/13</b>\n{question}",
         parse_mode="HTML"
     )
 
@@ -63,7 +72,7 @@ async def process_value(message: Message, state: FSMContext):
     try:
         value = float(message.text.replace(",", "."))
     except ValueError:
-        await message.answer("⚠️ Введи числовое значение, например: <b>13.2</b>", parse_mode="HTML")
+        await message.answer("⚠️ Please enter a numeric value, e.g. <b>13.2</b>", parse_mode="HTML")
         return
 
     values.append(value)
@@ -73,56 +82,61 @@ async def process_value(message: Message, state: FSMContext):
         await state.update_data(step=step, values=values)
         feature, question = FEATURE_QUESTIONS[step]
         await message.answer(
-            f"<b>Шаг {step + 1}/13</b>\n{question}",
+            f"<b>Step {step + 1}/13</b>\n{question}",
             parse_mode="HTML"
         )
     else:
         await state.clear()
         result = predict(values)
 
-        votes_str = " | ".join(
-            f"{result['target_names'][i]}: {result['votes'][i]}"
+        class_id = result["class_id"]
+        wine_name = WINE_CLASSES[class_id]
+
+        votes_str = "\n".join(
+            f"  {WINE_CLASSES[i]}: {result['votes'][i]} votes"
             for i in range(len(result['target_names']))
         )
 
         await message.answer(
-            f"🍷 <b>Результат предсказания:</b>\n\n"
-            f"🏆 Класс: <b>{result['class_name']}</b>\n"
-            f"📊 Уверенность: <b>{result['confidence']}%</b>\n"
-            f"🌲 Голоса деревьев:\n{votes_str}\n\n"
-            f"✅ Модель проанализировала все 13 признаков!",
+            f"🍷 <b>Prediction Result:</b>\n\n"
+            f"🏆 Wine type: <b>{wine_name}</b>\n"
+            f"📊 Confidence: <b>{result['confidence']}%</b>\n\n"
+            f"🌲 Forest voting:\n{votes_str}\n\n"
+            f"✅ All 13 features analyzed by 100 trees!",
             parse_mode="HTML",
             reply_markup=main_menu()
         )
 
-# Метрики
-@router.message(F.text == "📊 Метрики модели")
+# Metrics
+@router.message(F.text == "📊 Model Metrics")
 async def show_metrics(message: Message):
     rf, _, _ = load_model()
     await message.answer(
-        f"📊 <b>Метрики модели Random Forest:</b>\n\n"
-        f"✅ Accuracy:  <b>100%</b>\n"
-        f"✅ ROC-AUC:   <b>100%</b>\n"
-        f"✅ OOB Score: <b>97.89%</b>\n"
-        f"🌲 Деревьев:  <b>{rf.n_estimators}</b>\n"
-        f"📏 Признаков: <b>13</b>\n"
-        f"🍷 Классов:   <b>3</b>",
+        f"📊 <b>Random Forest Model Metrics:</b>\n\n"
+        f"✅ Accuracy:   <b>100%</b>\n"
+        f"✅ ROC-AUC:    <b>100%</b>\n"
+        f"✅ OOB Score:  <b>97.89%</b>\n\n"
+        f"⚙️ <b>Model Parameters:</b>\n"
+        f"🌲 Trees:      <b>{rf.n_estimators}</b>\n"
+        f"📏 Features:   <b>13</b>\n"
+        f"🍷 Classes:    <b>3 (Barolo, Grignolino, Barbera)</b>\n\n"
+        f"📦 Dataset:    <b>UCI Wine Dataset (178 samples)</b>",
         parse_mode="HTML"
     )
 
-# Графики
-@router.message(F.text == "📈 Графики")
+# Graphs
+@router.message(F.text == "📈 Graphs")
 async def show_graphs_menu(message: Message):
-    await message.answer("Выбери график 👇", reply_markup=graphs_menu())
+    await message.answer("Choose a graph to display 👇", reply_markup=graphs_menu())
 
 @router.callback_query(F.data.startswith("plot_"))
 async def send_plot(callback: CallbackQuery):
     plots = {
-        "plot_importance": ("plots/feature_importance.png", "🌟 Feature Importance"),
-        "plot_confusion":  ("plots/confusion_matrix.png",  "🎯 Confusion Matrix"),
-        "plot_roc":        ("plots/roc_curve.png",         "📉 ROC Curve"),
-        "plot_tree":       ("plots/single_tree.png",       "🌲 Одно дерево из леса"),
-        "plot_learning":   ("plots/learning_curve.png",    "📊 Learning Curve"),
+        "plot_importance": ("plots/feature_importance.png", "🌟 Feature Importance — top predictive features"),
+        "plot_confusion":  ("plots/confusion_matrix.png",  "🎯 Confusion Matrix — prediction errors"),
+        "plot_roc":        ("plots/roc_curve.png",         "📉 ROC Curve — model discrimination ability"),
+        "plot_tree":       ("plots/single_tree.png",       "🌲 Single tree from the Random Forest (max_depth=3)"),
+        "plot_learning":   ("plots/learning_curve.png",    "📊 Learning Curve — accuracy vs number of trees"),
     }
 
     key = callback.data
@@ -132,19 +146,27 @@ async def send_plot(callback: CallbackQuery):
             photo = FSInputFile(path)
             await callback.message.answer_photo(photo=photo, caption=caption)
         else:
-            await callback.message.answer("⚠️ График не найден. Запусти ml/train.py")
+            await callback.message.answer("⚠️ Graph not found. Please run ml/train.py first.")
 
     await callback.answer()
 
-# Как работает RF
-@router.message(F.text == "ℹ️ Как работает RF?")
+# How RF works
+@router.message(F.text == "ℹ️ How does RF work?")
 async def how_it_works(message: Message):
     await message.answer(
-        "🌲 <b>Как работает Random Forest?</b>\n\n"
-        "1️⃣ <b>Bootstrap</b> — каждое дерево обучается на случайной выборке данных с повторениями\n\n"
-        "2️⃣ <b>Random subspace</b> — при каждом разбиении узла выбирается случайное подмножество признаков\n\n"
-        "3️⃣ <b>Голосование</b> — каждое дерево голосует за класс, побеждает большинство\n\n"
-        "4️⃣ <b>OOB Score</b> — ~37% данных не попадает в обучение каждого дерева и используется для валидации\n\n"
-        "🎯 Итог: ансамбль слабых деревьев даёт сильную модель!",
+        "🌲 <b>How does Random Forest work?</b>\n\n"
+        "1️⃣ <b>Bootstrap</b>\n"
+        "Each tree trains on a random sample of data with replacement. "
+        "About 37% of samples are left out (OOB).\n\n"
+        "2️⃣ <b>Random Subspace</b>\n"
+        "At each node split, only a random subset of features is considered. "
+        "This decorrelates the trees.\n\n"
+        "3️⃣ <b>Voting</b>\n"
+        "Each tree independently predicts a class. "
+        "The final prediction is the majority vote.\n\n"
+        "4️⃣ <b>OOB Score</b>\n"
+        "Out-of-bag samples serve as a free validation set — "
+        "no need for a separate cross-validation!\n\n"
+        "🎯 <b>Result:</b> An ensemble of weak trees creates a strong, robust model!",
         parse_mode="HTML"
     )
