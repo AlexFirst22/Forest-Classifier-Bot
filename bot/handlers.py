@@ -5,138 +5,324 @@ from aiogram.filters import CommandStart
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 
-from bot.keyboards import main_menu, graphs_menu
-from ml.predict import predict, load_model
+from bot.keyboards import (main_menu, home_ownership_keyboard,
+                            loan_intent_keyboard, loan_grade_keyboard,
+                            default_history_keyboard, graphs_menu)
+from ml.predict import predict
 
 router = Router()
 
-WINE_CLASSES = {
-    0: "🍷 Barolo",
-    1: "🍇 Grignolino",
-    2: "🌹 Barbera"
-}
 
-class WineForm(StatesGroup):
-    waiting_for_values = State()
+class CreditForm(StatesGroup):
+    age = State()
+    income = State()
+    home_ownership = State()
+    emp_length = State()
+    loan_intent = State()
+    loan_grade = State()
+    loan_amnt = State()
+    loan_int_rate = State()
+    default_on_file = State()
+    cred_hist_length = State()
 
-FEATURE_QUESTIONS = [
-    ("alcohol",                      "🍶 Alcohol (e.g. 13.2)"),
-    ("malic_acid",                   "🍋 Malic Acid (e.g. 1.78)"),
-    ("ash",                          "⚗️ Ash (e.g. 2.14)"),
-    ("alcalinity_of_ash",            "🧪 Alcalinity of Ash (e.g. 11.2)"),
-    ("magnesium",                    "🔩 Magnesium (e.g. 100.0)"),
-    ("total_phenols",                "🌿 Total Phenols (e.g. 2.65)"),
-    ("flavanoids",                   "🌸 Flavanoids (e.g. 2.76)"),
-    ("nonflavanoid_phenols",         "🍂 Nonflavanoid Phenols (e.g. 0.26)"),
-    ("proanthocyanins",              "🫐 Proanthocyanins (e.g. 1.28)"),
-    ("color_intensity",              "🎨 Color Intensity (e.g. 4.38)"),
-    ("hue",                          "🌈 Hue (e.g. 1.05)"),
-    ("od280/od315_of_diluted_wines", "🔬 OD280/OD315 (e.g. 3.40)"),
-    ("proline",                      "💎 Proline (e.g. 1050.0)"),
-]
 
 # /start
 @router.message(CommandStart())
 async def cmd_start(message: Message):
     await message.answer(
-        "👋 Welcome to <b>Forest Classifier Bot</b> 🌲\n\n"
-        "I can identify the type of Italian wine based on its chemical characteristics "
-        "using the <b>Random Forest</b> algorithm.\n\n"
-        "🍷 Wines I can classify:\n"
-        "• <b>Barolo</b> — bold, tannic, full-bodied\n"
-        "• <b>Grignolino</b> — light, delicate, aromatic\n"
-        "• <b>Barbera</b> — fruity, low tannin, high acidity\n\n"
-        "Choose an action below 👇",
+        "👋 Welcome to <b>💳 Credit Risk Bot</b>!\n\n"
+        "I use a <b>Random Forest</b> model trained on 32,000+ real loan records "
+        "to predict whether a loan application is likely to be approved or flagged as high risk.\n\n"
+        "🔍 <b>What I can do:</b>\n"
+        "• Analyze your loan application in seconds\n"
+        "• Show confidence level of the prediction\n"
+        "• Explain which factors influenced the decision\n"
+        "• Give tips to improve your chances\n\n"
+        "Press <b>💳 Check Credit Risk</b> to get started 👇",
         parse_mode="HTML",
         reply_markup=main_menu()
     )
 
-# Predict
-@router.message(F.text == "🍷 Predict Wine")
-async def start_predict(message: Message, state: FSMContext):
-    await state.set_state(WineForm.waiting_for_values)
-    await state.update_data(step=0, values=[])
-    feature, question = FEATURE_QUESTIONS[0]
+
+# Start prediction flow
+@router.message(F.text == "💳 Check Credit Risk")
+async def start_credit_check(message: Message, state: FSMContext):
+    await state.set_state(CreditForm.age)
     await message.answer(
-        "Let's classify your wine! Enter the chemical characteristics one by one.\n\n"
-        f"<b>Step 1/13</b>\n{question}",
+        "Let's analyze your loan application! I'll ask you a few questions.\n\n"
+        "<b>Step 1/10</b>\n"
+        "🎂 What is your <b>age</b>?\n\n"
+        "<i>Enter a number (e.g. 35)</i>",
         parse_mode="HTML"
     )
 
-@router.message(WineForm.waiting_for_values)
-async def process_value(message: Message, state: FSMContext):
-    data = await state.get_data()
-    step = data["step"]
-    values = data["values"]
 
+# Age
+@router.message(CreditForm.age)
+async def process_age(message: Message, state: FSMContext):
     try:
-        value = float(message.text.replace(",", "."))
+        age = int(message.text)
+        if not 18 <= age <= 99:
+            raise ValueError
     except ValueError:
-        await message.answer("⚠️ Please enter a numeric value, e.g. <b>13.2</b>", parse_mode="HTML")
+        await message.answer("⚠️ Please enter a valid age between 18 and 99.")
         return
 
-    values.append(value)
-    step += 1
+    await state.update_data(person_age=age)
+    await state.set_state(CreditForm.income)
+    await message.answer(
+        "<b>Step 2/10</b>\n"
+        "💰 What is your <b>annual income</b> (in $)?\n\n"
+        "<i>Enter a number (e.g. 55000)</i>",
+        parse_mode="HTML"
+    )
 
-    if step < len(FEATURE_QUESTIONS):
-        await state.update_data(step=step, values=values)
-        feature, question = FEATURE_QUESTIONS[step]
-        await message.answer(
-            f"<b>Step {step + 1}/13</b>\n{question}",
-            parse_mode="HTML"
+
+# Income
+@router.message(CreditForm.income)
+async def process_income(message: Message, state: FSMContext):
+    try:
+        income = float(message.text.replace(",", ""))
+        if income <= 0:
+            raise ValueError
+    except ValueError:
+        await message.answer("⚠️ Please enter a valid income amount (e.g. 55000).")
+        return
+
+    await state.update_data(person_income=income)
+    await state.set_state(CreditForm.home_ownership)
+    await message.answer(
+        "<b>Step 3/10</b>\n"
+        "🏠 What is your <b>home ownership</b> status?",
+        parse_mode="HTML",
+        reply_markup=home_ownership_keyboard()
+    )
+
+
+# Home ownership
+@router.callback_query(F.data.startswith("own_"))
+async def process_home_ownership(callback: CallbackQuery, state: FSMContext):
+    value = callback.data.split("_")[1]
+    await state.update_data(person_home_ownership=value)
+    await state.set_state(CreditForm.emp_length)
+    await callback.message.answer(
+        "<b>Step 4/10</b>\n"
+        "💼 How many <b>years have you been employed</b>?\n\n"
+        "<i>Enter a number (e.g. 5)</i>",
+        parse_mode="HTML"
+    )
+    await callback.answer()
+
+
+# Employment length
+@router.message(CreditForm.emp_length)
+async def process_emp_length(message: Message, state: FSMContext):
+    try:
+        emp = float(message.text.replace(",", "."))
+        if emp < 0:
+            raise ValueError
+    except ValueError:
+        await message.answer("⚠️ Please enter a valid number of years (e.g. 5).")
+        return
+
+    await state.update_data(person_emp_length=emp)
+    await state.set_state(CreditForm.loan_intent)
+    await message.answer(
+        "<b>Step 5/10</b>\n"
+        "🎯 What is the <b>purpose</b> of the loan?",
+        parse_mode="HTML",
+        reply_markup=loan_intent_keyboard()
+    )
+
+
+# Loan intent
+@router.callback_query(F.data.startswith("intent_"))
+async def process_loan_intent(callback: CallbackQuery, state: FSMContext):
+    value = callback.data.split("_")[1]
+    await state.update_data(loan_intent=value)
+    await state.set_state(CreditForm.loan_grade)
+    await callback.message.answer(
+        "<b>Step 6/10</b>\n"
+        "🏅 What is your <b>loan grade</b>?\n\n"
+        "<i>A = best credit, G = highest risk</i>",
+        parse_mode="HTML",
+        reply_markup=loan_grade_keyboard()
+    )
+    await callback.answer()
+
+
+# Loan grade
+@router.callback_query(F.data.startswith("grade_"))
+async def process_loan_grade(callback: CallbackQuery, state: FSMContext):
+    value = callback.data.split("_")[1]
+    await state.update_data(loan_grade=value)
+    await state.set_state(CreditForm.loan_amnt)
+    await callback.message.answer(
+        "<b>Step 7/10</b>\n"
+        "💵 What is the <b>loan amount</b> you are requesting (in $)?\n\n"
+        "<i>Enter a number (e.g. 10000)</i>",
+        parse_mode="HTML"
+    )
+    await callback.answer()
+
+
+# Loan amount
+@router.message(CreditForm.loan_amnt)
+async def process_loan_amnt(message: Message, state: FSMContext):
+    try:
+        amnt = float(message.text.replace(",", ""))
+        if amnt <= 0:
+            raise ValueError
+    except ValueError:
+        await message.answer("⚠️ Please enter a valid loan amount (e.g. 10000).")
+        return
+
+    await state.update_data(loan_amnt=amnt)
+    await state.set_state(CreditForm.loan_int_rate)
+    await message.answer(
+        "<b>Step 8/10</b>\n"
+        "📈 What is the <b>interest rate</b> on the loan (%)?\n\n"
+        "<i>Enter a number (e.g. 12.5)</i>",
+        parse_mode="HTML"
+    )
+
+
+# Interest rate
+@router.message(CreditForm.loan_int_rate)
+async def process_int_rate(message: Message, state: FSMContext):
+    try:
+        rate = float(message.text.replace(",", "."))
+        if not 1 <= rate <= 30:
+            raise ValueError
+    except ValueError:
+        await message.answer("⚠️ Please enter a valid interest rate between 1 and 30 (e.g. 12.5).")
+        return
+
+    await state.update_data(loan_int_rate=rate)
+    await state.set_state(CreditForm.default_on_file)
+    await message.answer(
+        "<b>Step 9/10</b>\n"
+        "📋 Do you have any <b>previous defaults</b> on record?",
+        parse_mode="HTML",
+        reply_markup=default_history_keyboard()
+    )
+
+
+# Default on file
+@router.callback_query(F.data.startswith("default_"))
+async def process_default(callback: CallbackQuery, state: FSMContext):
+    value = callback.data.split("_")[1]
+    await state.update_data(cb_person_default_on_file=value)
+    await state.set_state(CreditForm.cred_hist_length)
+    await callback.message.answer(
+        "<b>Step 10/10</b>\n"
+        "🗓 How many <b>years of credit history</b> do you have?\n\n"
+        "<i>Enter a number (e.g. 4)</i>",
+        parse_mode="HTML"
+    )
+    await callback.answer()
+
+
+# Credit history length → final prediction
+@router.message(CreditForm.cred_hist_length)
+async def process_cred_hist(message: Message, state: FSMContext):
+    try:
+        hist = int(message.text)
+        if hist < 0:
+            raise ValueError
+    except ValueError:
+        await message.answer("⚠️ Please enter a valid number of years (e.g. 4).")
+        return
+
+    await state.update_data(cb_person_cred_hist_length=hist)
+    data = await state.get_data()
+    await state.clear()
+
+    await message.answer("🔍 Analyzing your application...")
+
+    try:
+        result = predict(data)
+    except Exception as e:
+        await message.answer(f"⚠️ Prediction error: {str(e)}")
+        return
+
+    prediction = result["prediction"]
+    prob_approved = result["prob_approved"]
+    prob_default = result["prob_default"]
+    top_features = result["top_features"]
+
+    # Top factors
+    factors_str = "\n".join(
+        f"  • {feat}: {round(imp * 100, 1)}% influence"
+        for feat, imp in top_features
+    )
+
+    if prediction == 0:
+        verdict = "✅ <b>APPROVED — Low Risk</b>"
+        verdict_detail = (
+            f"The model is <b>{prob_approved}%</b> confident this loan is low risk.\n\n"
+            f"🌲 Top factors in your favor:\n{factors_str}"
         )
     else:
-        await state.clear()
-        result = predict(values)
-
-        class_id = result["class_id"]
-        wine_name = WINE_CLASSES[class_id]
-
-        votes_str = "\n".join(
-            f"  {WINE_CLASSES[i]}: {result['votes'][i]} votes"
-            for i in range(len(result['target_names']))
+        verdict = "❌ <b>DENIED — High Risk</b>"
+        verdict_detail = (
+            f"The model is <b>{prob_default}%</b> confident this loan is high risk.\n\n"
+            f"⚠️ Top risk factors:\n{factors_str}\n\n"
+            f"💡 <b>Tips to improve your chances:</b>\n"
+            f"  • Reduce the loan amount\n"
+            f"  • Improve your loan grade (pay off existing debts)\n"
+            f"  • Build a longer credit history\n"
+            f"  • Lower your debt-to-income ratio"
         )
 
-        await message.answer(
-            f"🍷 <b>Prediction Result:</b>\n\n"
-            f"🏆 Wine type: <b>{wine_name}</b>\n"
-            f"📊 Confidence: <b>{result['confidence']}%</b>\n\n"
-            f"🌲 Forest voting:\n{votes_str}\n\n"
-            f"✅ All 13 features analyzed by 100 trees!",
-            parse_mode="HTML",
-            reply_markup=main_menu()
-        )
+    await message.answer(
+        f"━━━━━━━━━━━━━━━━━━━━\n"
+        f"💳 <b>Credit Risk Assessment</b>\n"
+        f"━━━━━━━━━━━━━━━━━━━━\n\n"
+        f"{verdict}\n\n"
+        f"{verdict_detail}\n\n"
+        f"━━━━━━━━━━━━━━━━━━━━\n"
+        f"<i>Based on Random Forest model trained on 32,000+ loan records</i>",
+        parse_mode="HTML",
+        reply_markup=main_menu()
+    )
+
 
 # Metrics
 @router.message(F.text == "📊 Model Metrics")
 async def show_metrics(message: Message):
-    rf, _, _ = load_model()
     await message.answer(
-        f"📊 <b>Random Forest Model Metrics:</b>\n\n"
-        f"✅ Accuracy:   <b>100%</b>\n"
-        f"✅ ROC-AUC:    <b>100%</b>\n"
-        f"✅ OOB Score:  <b>97.89%</b>\n\n"
-        f"⚙️ <b>Model Parameters:</b>\n"
-        f"🌲 Trees:      <b>{rf.n_estimators}</b>\n"
-        f"📏 Features:   <b>13</b>\n"
-        f"🍷 Classes:    <b>3 (Barolo, Grignolino, Barbera)</b>\n\n"
-        f"📦 Dataset:    <b>UCI Wine Dataset (178 samples)</b>",
+        "📊 <b>Random Forest Model Metrics:</b>\n\n"
+        "✅ Accuracy:   <b>93.50%</b>\n"
+        "✅ ROC-AUC:    <b>93.75%</b>\n"
+        "✅ OOB Score:  <b>93.01%</b>\n\n"
+        "⚙️ <b>Model Parameters:</b>\n"
+        "🌲 Trees:      <b>100</b>\n"
+        "📏 Features:   <b>11</b>\n"
+        "🎯 Task:       <b>Binary Classification</b>\n\n"
+        "📦 <b>Dataset:</b>\n"
+        "📁 Records:    <b>32,000+</b>\n"
+        "✅ Approved:   <b>78.2%</b>\n"
+        "❌ Default:    <b>21.8%</b>",
         parse_mode="HTML"
     )
+
 
 # Graphs
 @router.message(F.text == "📈 Graphs")
 async def show_graphs_menu(message: Message):
     await message.answer("Choose a graph to display 👇", reply_markup=graphs_menu())
 
+
 @router.callback_query(F.data.startswith("plot_"))
 async def send_plot(callback: CallbackQuery):
     plots = {
-        "plot_importance": ("plots/feature_importance.png", "🌟 Feature Importance — top predictive features"),
-        "plot_confusion":  ("plots/confusion_matrix.png",  "🎯 Confusion Matrix — prediction errors"),
-        "plot_roc":        ("plots/roc_curve.png",         "📉 ROC Curve — model discrimination ability"),
-        "plot_tree":       ("plots/single_tree.png",       "🌲 Single tree from the Random Forest (max_depth=3)"),
-        "plot_learning":   ("plots/learning_curve.png",    "📊 Learning Curve — accuracy vs number of trees"),
+        "plot_importance":   ("plots/feature_importance.png",  "🌟 Feature Importance"),
+        "plot_confusion":    ("plots/confusion_matrix.png",    "🎯 Confusion Matrix"),
+        "plot_roc":          ("plots/roc_curve.png",           "📉 ROC Curve"),
+        "plot_learning":     ("plots/learning_curve.png",      "📊 Learning Curve"),
+        "plot_distribution": ("plots/class_distribution.png",  "📦 Class Distribution"),
+        "plot_correlation":  ("plots/correlation_matrix.png",  "🔥 Correlation Matrix"),
     }
 
     key = callback.data
@@ -150,23 +336,25 @@ async def send_plot(callback: CallbackQuery):
 
     await callback.answer()
 
+
 # How RF works
 @router.message(F.text == "ℹ️ How does RF work?")
 async def how_it_works(message: Message):
     await message.answer(
         "🌲 <b>How does Random Forest work?</b>\n\n"
         "1️⃣ <b>Bootstrap</b>\n"
-        "Each tree trains on a random sample of data with replacement. "
-        "About 37% of samples are left out (OOB).\n\n"
+        "Each tree trains on a random sample of the 32,000 loan records. "
+        "About 37% of records are left out (OOB) for free validation.\n\n"
         "2️⃣ <b>Random Subspace</b>\n"
-        "At each node split, only a random subset of features is considered. "
-        "This decorrelates the trees.\n\n"
+        "At each node, only a random subset of the 11 features is considered. "
+        "This prevents trees from being too similar.\n\n"
         "3️⃣ <b>Voting</b>\n"
-        "Each tree independently predicts a class. "
-        "The final prediction is the majority vote.\n\n"
+        "All 100 trees independently vote: Approved or Default. "
+        "The majority wins.\n\n"
         "4️⃣ <b>OOB Score</b>\n"
-        "Out-of-bag samples serve as a free validation set — "
-        "no need for a separate cross-validation!\n\n"
-        "🎯 <b>Result:</b> An ensemble of weak trees creates a strong, robust model!",
+        "Records not used for training each tree are used to validate it — "
+        "giving us a free accuracy estimate of 93.01%.\n\n"
+        "🎯 <b>Result:</b> 100 trees working together achieve 93.5% accuracy "
+        "on real-world credit risk data!",
         parse_mode="HTML"
     )

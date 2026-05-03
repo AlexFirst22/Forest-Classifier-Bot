@@ -1,25 +1,47 @@
 import joblib
 import numpy as np
+import pandas as pd
+
 
 def load_model():
     rf = joblib.load("models/rf_model.pkl")
+    label_encoders = joblib.load("models/label_encoders.pkl")
     feature_names = joblib.load("models/feature_names.pkl")
-    target_names = joblib.load("models/target_names.pkl")
-    return rf, feature_names, target_names
+    return rf, label_encoders, feature_names
 
-def predict(input_values: list):
-    rf, feature_names, target_names = load_model()
 
-    X = np.array(input_values).reshape(1, -1)
-    pred_class = rf.predict(X)[0]
-    pred_proba = rf.predict_proba(X)[0]
+def predict(data: dict):
+    rf, label_encoders, feature_names = load_model()
 
-    votes = [int(round(p * rf.n_estimators)) for p in pred_proba]
+    df = pd.DataFrame([data])
+
+    # Auto-calculate loan_percent_income
+    df['loan_percent_income'] = df['loan_amnt'] / df['person_income']
+
+    # Encode categorical features
+    cat_cols = ['person_home_ownership', 'loan_intent', 'loan_grade', 'cb_person_default_on_file']
+    for col in cat_cols:
+        le = label_encoders[col]
+        df[col] = le.transform(df[col])
+
+    # Reorder columns
+    df = df[feature_names]
+
+    prob_default = rf.predict_proba(df)[0][1]
+    prob_approved = rf.predict_proba(df)[0][0]
+    prediction = int(rf.predict(df)[0])
+
+    # Feature importance for explanation
+    importances = rf.feature_importances_
+    top_features = sorted(
+        zip(feature_names, importances),
+        key=lambda x: x[1],
+        reverse=True
+    )[:3]
 
     return {
-        "class_id": int(pred_class),
-        "class_name": target_names[pred_class],
-        "confidence": round(float(pred_proba[pred_class]) * 100, 1),
-        "votes": votes,
-        "target_names": target_names
+        "prediction": prediction,
+        "prob_approved": round(prob_approved * 100, 1),
+        "prob_default": round(prob_default * 100, 1),
+        "top_features": top_features
     }
