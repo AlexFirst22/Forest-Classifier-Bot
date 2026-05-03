@@ -1,12 +1,13 @@
-# 🌲 Forest Classifier Bot
+# 💳 Credit Risk Bot
 
-A Telegram bot for Italian wine classification using the **Random Forest** algorithm.
+A Telegram bot for credit risk assessment using the **Random Forest** algorithm.
 
 ## 📋 Project Description
 
-This project demonstrates the **Random Forest** ensemble learning algorithm applied to wine classification.
-The bot allows users to input 13 chemical characteristics of wine and receive a real-time prediction
-of the wine type using a trained RF model.
+This project demonstrates the **Random Forest** ensemble learning algorithm 
+applied to a real-world credit risk classification problem.
+The bot analyzes 10 personal and financial characteristics and predicts 
+whether a loan application is likely to be **approved** or flagged as **high risk**.
 
 **Assignment topic:** Random Forests (náhodné lesy) – učenie súborom
 
@@ -14,71 +15,45 @@ of the wine type using a trained RF model.
 
 | Button | Description |
 |---|---|
-| 🍷 Predict Wine | Step-by-step wine classification (13 inputs) |
-| 📊 Model Metrics | Accuracy, ROC-AUC, OOB Score, parameters |
+| 💳 Check Credit Risk | 10-step loan application analysis |
+| 📊 Model Metrics | Accuracy, ROC-AUC, OOB Score |
 | 📈 Graphs | Feature importance, confusion matrix, ROC curve, etc. |
 | ℹ️ How does RF work? | Plain-language explanation of the algorithm |
 
-## 🍷 Wine Classes
+## 📊 Dataset
 
-| Class | Wine | Description |
-|---|---|---|
-| class_0 | **Barolo** | Bold, tannic, full-bodied |
-| class_1 | **Grignolino** | Light, delicate, aromatic |
-| class_2 | **Barbera** | Fruity, low tannin, high acidity |
-
-## 📊 Datasets
-
-### 1. Wine Dataset (Primary — used in bot)
-- 178 samples, 13 features, 3 classes
-- Accuracy: **100%** | OOB Score: **97.89%** | ROC-AUC: **100%**
-
-### 2. Breast Cancer Dataset (Secondary — for comparison)
-- 569 samples, 30 features, 2 classes
-- Used to demonstrate RF performance on a larger, more complex dataset
-
-## 🌲 How Random Forest Works
-
-1. **Bootstrap** — each tree trains on a random sample with replacement (~63% of data)
-2. **Random subspace** — random subset of features considered at each node split
-3. **Voting** — each tree votes independently, majority class wins
-4. **OOB Score** — ~37% of data not used per tree = free built-in validation
+**Credit Risk Dataset** (Kaggle)
+- 32,000+ real loan records
+- 11 features (age, income, loan amount, grade, intent, etc.)
+- Binary classification: `0` = Approved, `1` = Default
 
 ## 📁 Project Structure
 ```
 Forest-Classifier-Bot/
 │
+│
 ├── bot/
-│   ├── __init__.py
+│   ├── init.py
 │   ├── bot.py
 │   ├── handlers.py
 │   └── keyboards.py
 │
 ├── ml/
-│   ├── __init__.py
+│   ├── init.py
 │   ├── train.py
 │   ├── predict.py
 │   └── visualize.py
 │
 ├── models/
 │   ├── rf_model.pkl
-│   ├── feature_names.pkl
-│   └── target_names.pkl
+│   ├── label_encoders.pkl
+│   └── feature_names.pkl
 │
 ├── plots/
-│   ├── class_distribution.png
-│   ├── correlation_matrix.png
-│   ├── boxplot_features.png
-│   ├── pairplot.png
-│   ├── confusion_matrix.png
-│   ├── feature_importance.png
-│   ├── learning_curve.png
-│   ├── roc_curve.png
-│   ├── single_tree.png
-│   ├── depth_curve.png
-│   ├── confusion_matrix_cancer.png
-│   ├── feature_importance_cancer.png
-│   └── comparison.png
+│   └── *.png (8 visualizations)
+│
+├── data/
+│   └── credit_risk_dataset.csv
 │
 ├── notebooks/
 │   └── exploration.ipynb
@@ -113,38 +88,23 @@ python -m bot.bot
 
 ## 📈 Model Performance
 
-| Metric | Wine Dataset | Breast Cancer Dataset |
-|---|---|---|
-| Accuracy | 1.0000 | ~0.9649 |
-| OOB Score | 0.9789 | ~0.9614 |
-| ROC-AUC | 1.0000 | ~0.9970 |
-| n_estimators | 100 | 100 |
-| Features | 13 | 30 |
-| Samples | 178 | 569 |
-
-## 📊 Visualizations
-
-| Plot | Description |
+| Metric | Value |
 |---|---|
-| `feature_importance.png` | Most predictive wine features |
-| `confusion_matrix.png` | Prediction errors per class |
-| `roc_curve.png` | ROC curve for all 3 classes |
-| `single_tree.png` | One decision tree from the forest |
-| `learning_curve.png` | Accuracy vs number of trees |
-| `depth_curve.png` | Accuracy vs tree depth |
-| `comparison.png` | Wine vs Breast Cancer comparison |
-| `class_distribution.png` | Class balance in Wine dataset |
-| `correlation_matrix.png` | Feature correlation heatmap |
-| `boxplot_features.png` | Feature distributions per class |
-| `pairplot.png` | Pairwise feature relationships |
+| Accuracy | 93.50% |
+| ROC-AUC | 93.75% |
+| OOB Score | 93.01% |
+| n_estimators | 100 |
+| Features | 11 |
+| Training records | ~25,600 |
 
 ## 🛠️ Technologies
 
 | Library | Purpose |
 |---|---|
-| `scikit-learn` | Random Forest model, GridSearchCV |
+| `scikit-learn` | Random Forest, GridSearchCV, metrics |
 | `aiogram 3.x` | Telegram bot framework |
 | `pandas`, `numpy` | Data processing |
 | `matplotlib`, `seaborn` | Visualizations |
 | `joblib` | Model persistence |
-| `python-dotenv` | Environment configuration |
+| `python-dotenv` | Configuration |
+

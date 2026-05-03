@@ -2,125 +2,133 @@
 
 ## 1. Algorithm Overview
 
-Random Forest is an ensemble machine learning method that builds a large number
-of decision trees during training and outputs the class that receives the most votes.
+Random Forest is an ensemble machine learning method that builds many decision 
+trees and combines their predictions by majority voting.
+Each tree is trained differently, which makes the ensemble more robust 
+and accurate than any single tree.
 
-### Core principles:
+### Core Principles
 
 **Bootstrap Aggregation (Bagging)**
-Each tree is trained on a random sample of the dataset drawn with replacement.
-On average, ~63% of samples appear in each bootstrap sample,
-while the remaining ~37% form the out-of-bag (OOB) set.
+Each of the 100 trees is trained on a random sample of the dataset 
+drawn with replacement. On average ~63% of records appear in each 
+bootstrap sample. The remaining ~37% form the out-of-bag (OOB) set 
+used for free validation.
 
 **Random Feature Subspace**
 At every node split, only a random subset of features is evaluated.
-This decorrelates individual trees and reduces variance of the ensemble.
+For 11 features, typically sqrt(11) ≈ 3 features are considered per split.
+This decorrelates the trees and reduces variance of the ensemble.
 
 **Majority Voting**
-Each tree independently predicts a class label.
-The final prediction is determined by majority vote across all trees.
+Each tree independently predicts: Approved (0) or Default (1).
+The final prediction is determined by majority vote across all 100 trees.
 
 **OOB Score**
-Since each tree never sees its OOB samples during training,
-these samples serve as a built-in validation set — no separate cross-validation needed.
+Each tree validates itself on its OOB samples — records it never saw 
+during training. This gives a free, unbiased accuracy estimate 
+without needing a separate validation set.
 
 ---
 
-## 2. Datasets Used
+## 2. Dataset
 
-### Wine Dataset (Primary)
-- **Source:** `sklearn.datasets.load_wine` (UCI Machine Learning Repository)
-- **Samples:** 178
-- **Features:** 13 chemical characteristics (alcohol, flavanoids, proline, etc.)
-- **Classes:** 3 Italian wines — Barolo, Grignolino, Barbera
-- **Used for:** Bot predictions, all main visualizations
+**Credit Risk Dataset** — Kaggle
+- 32,581 real loan records
+- 11 features per record
+- Binary target: 0 = Approved, 1 = Default (21.8% default rate)
 
-### Breast Cancer Dataset (Secondary)
-- **Source:** `sklearn.datasets.load_breast_cancer`
-- **Samples:** 569
-- **Features:** 30 (cell nucleus measurements)
-- **Classes:** 2 (Malignant, Benign)
-- **Used for:** Comparison, demonstrating RF scalability
+### Features Used
+
+| Feature | Type | Description |
+|---|---|---|
+| person_age | Numeric | Applicant age |
+| person_income | Numeric | Annual income ($) |
+| person_home_ownership | Categorical | RENT / OWN / MORTGAGE / OTHER |
+| person_emp_length | Numeric | Years of employment |
+| loan_intent | Categorical | Purpose of loan |
+| loan_grade | Categorical | Credit grade A-G |
+| loan_amnt | Numeric | Loan amount ($) |
+| loan_int_rate | Numeric | Interest rate (%) |
+| loan_percent_income | Numeric | loan_amnt / person_income |
+| cb_person_default_on_file | Categorical | Previous default Y/N |
+| cb_person_cred_hist_length | Numeric | Years of credit history |
+
+### Data Preprocessing
+- Removed outliers: age > 100, employment > 60 years
+- Filled missing values with median (loan_int_rate, emp_length)
+- Encoded categorical features with LabelEncoder
+- loan_percent_income calculated automatically from income and loan amount
 
 ---
 
 ## 3. Effectiveness Metrics
 
-| Metric | Description | Wine | Breast Cancer |
-|---|---|---|---|
-| Accuracy | Ratio of correct predictions | 1.0000 | ~0.9649 |
-| Precision | True positives / predicted positives | 1.0000 | ~0.96 |
-| Recall | True positives / actual positives | 1.0000 | ~0.96 |
-| F1-score | Harmonic mean of precision and recall | 1.0000 | ~0.96 |
-| ROC-AUC | Area under the ROC curve | 1.0000 | ~0.9970 |
-| OOB Score | Out-of-bag validation accuracy | 0.9789 | ~0.9614 |
+| Metric | Value | Description |
+|---|---|---|
+| Accuracy | 93.50% | Overall correct predictions |
+| Precision (Default) | 97% | When model says Default, it's right 97% of the time |
+| Recall (Default) | 72% | Model catches 72% of all actual defaults |
+| F1-score | 0.83 | Harmonic mean of precision and recall |
+| ROC-AUC | 93.75% | Model's ability to distinguish classes |
+| OOB Score | 93.01% | Free validation on unseen data |
 
 ---
 
-## 4. Hyperparameter Analysis
-
-### n_estimators (number of trees)
-Tested values: 5, 10, 20, 50, 100, 150, 200
-- More trees → more stable predictions
-- Returns diminish after ~100 trees
-- Best balance at n_estimators=100
-
-### max_depth (tree depth)
-Tested values: 1, 2, 3, 5, 10, None
-- Shallow trees → underfitting
-- Deep trees → potential overfitting
-- None (full depth) works best for Wine dataset
-
-### GridSearchCV
-Full grid search over n_estimators, max_depth, min_samples_split
-with 5-fold cross-validation to find optimal hyperparameters.
-
----
-
-## 5. Visualizations
+## 4. Visualizations
 
 | Plot | What it shows |
 |---|---|
-| Feature Importance | Alcohol, flavanoids and proline are the most predictive |
-| Confusion Matrix | All 36 test samples correctly classified |
-| ROC Curve | AUC = 1.0 for all 3 classes |
-| Single Tree | Structure of one tree from the forest (max_depth=3) |
+| Feature Importance | loan_percent_income and loan_grade are top predictors |
+| Confusion Matrix | Model correctly classifies 99% of approved, 72% of defaults |
+| ROC Curve | AUC = 0.9375, strong discrimination ability |
 | Learning Curve | Accuracy stabilizes around 50-100 trees |
-| Depth Curve | Effect of max_depth on train/test accuracy |
-| Comparison | RF performs well on both datasets |
+| Class Distribution | 78.2% approved vs 21.8% default |
+| Correlation Matrix | Interest rate and loan grade are strongly correlated |
+| Feature Distributions | Income and interest rate differ significantly by class |
+| Categorical Features | Grade G and previous defaults = highest risk |
 
 ---
 
-## 6. Functional Application — Telegram Bot
+## 5. Functional Application — Telegram Bot
 
-The bot was built using **aiogram 3.x** and implements the following workflow:
+The bot implements a complete loan assessment pipeline:
 
-1. User starts the bot with `/start`
-2. User selects **🍷 Predict Wine**
-3. Bot asks for 13 chemical values one by one (FSM — Finite State Machine)
-4. Values are passed to the trained RF model via `ml/predict.py`
-5. Bot returns the predicted wine type (Barolo / Grignolino / Barbera),
-   confidence percentage, and individual tree votes
-6. User can also view all model graphs directly in the chat
-7. Algorithm explanation is available in plain language
+### Input Collection (FSM)
+The bot uses aiogram's Finite State Machine to collect 10 inputs:
+- Numeric inputs: age, income, employment, loan amount, interest rate, credit history
+- Button inputs: home ownership, loan intent, loan grade, previous default
 
-### Key implementation details:
-- **FSM (Finite State Machine)** — manages multi-step user input
-- **joblib** — loads pre-trained model from disk
-- **FSInputFile** — sends locally generated PNG plots to Telegram
-- **InlineKeyboardMarkup** — interactive graph selection menu
+### Automatic Feature Engineering
+loan_percent_income is calculated automatically:
+loan_percent_income = loan_amnt / person_income
+The user never enters this directly.
+
+### Categorical Encoding
+LabelEncoder transforms text categories to numbers using the same 
+encoders that were fitted during training — ensuring consistency.
+
+### Prediction
+The trained Random Forest model outputs:
+- Class prediction: 0 (Approved) or 1 (Default)
+- Probability scores: e.g. 87% Approved, 13% Default
+
+### Result Explanation
+If denied, the bot shows:
+- Top 3 features with highest importance from the model
+- Concrete tips: reduce loan amount, improve grade, build credit history
 
 ---
 
-## 7. Technologies
+## 6. Technologies
 
 | Library | Version | Purpose |
 |---|---|---|
-| scikit-learn | latest | RandomForestClassifier, GridSearchCV, metrics |
-| aiogram | 3.x | Telegram bot framework |
-| pandas | latest | Data manipulation |
+| scikit-learn | latest | RandomForestClassifier, LabelEncoder, metrics |
+| aiogram | 3.x | Telegram bot, FSM state management |
+| pandas | latest | Data loading and preprocessing |
 | numpy | latest | Numerical operations |
 | matplotlib | latest | Plot generation |
 | seaborn | latest | Statistical visualizations |
-| joblib | latest | Model serialization |
-| python-dotenv | latest | Environment variable management |
+| joblib | latest | Model and encoder serialization |
+| python-dotenv | latest | Token management |
